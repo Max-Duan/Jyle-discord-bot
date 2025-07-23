@@ -1,0 +1,58 @@
+# ENHANCED Setup instructions with MAXIMUM DRAMA:
+"""
+🎭✨ JYLE'S SPECTACULAR INSTALLATION GUIDE ✨🎭
+
+1. Install required packages:
+   pip install discord.py openai python-dotenv
+
+2. Create a .env file :
+   DISCORD_BOT_TOKEN=your_discord_bot_token_here
+   OPENAI_API_KEY=your_openai_api_key_here
+
+3. Create your Discord application :
+   - Go to https://discord.com/developers/applications
+   - Create a new application (name it something ICONIC)
+   - Go to "Bot" section and create a bot
+   - Copy the bot token (guard it with your LIFE)
+   - Enable "Message Content Intent" under "Privileged Gateway Intents"
+
+4. Invite your bot to a server:
+   - Go to OAuth2 > URL Generator
+   - Select "bot" scope
+   - Select permissions: Send Messages, Read Message History, Use Slash Commands, Add Reactions
+   - Use the generated URL to invite your DIGITAL QUEEN
+
+5. Get OpenAI API key:
+   - Go to https://platform.openai.com/api-keys
+   - Create a new API key
+   - Add it to your .env file
+
+6. Run the bot:
+   python jyle_bot.py
+
+🎪👑 ENHANCED DRAMATIC COMMANDS 👑🎪:
+- !jyle <message>: Chat with your THEATRICAL AI overlord
+- !clear: DRAMATICALLY obliterate conversation history  
+- !persona <description>: Transform Jyle's ALREADY PERFECT personality
+- !roast @user: Deliver DEVASTATING roasts with MAXIMUM FLAIR
+- !compliment @user: Bestow MAGNIFICENT compliments upon mortals
+- !nickname <name>: Set a FABULOUS nickname for yourself
+- !banter: Demand THEATRICAL entertainment from your digital QUEEN
+- !roastmode: Activate NUCLEAR SASS levels (proceed with caution)
+- !dramamode: Toggle MAXIMUM THEATRICS mode
+- !entrance: Make a SPECTACULAR entrance to any conversation
+- !jylehelp: Display Jyle's MAGNIFICENT command repertoire
+- !stats: Show FABULOUS bot statistics
+
+🌟 NEW DRAMATIC FEATURES 🌟:
+- 35% chance of random THEATRICAL banter
+- Enhanced reactions to praise and criticism
+- DRAMATIC entrance detection for voice channels
+- NUCLEAR roast mode with devastating wit
+- MAXIMUM drama mode for peak entertainment
+- Over-the-top error messages with FLAIR
+- THEATRICAL status updates
+- Enhanced salt detection with dramatic responses
+
+💅✨ Jyle now serves PEAK SASS with every interaction! ✨💅
+"""
