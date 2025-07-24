@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 load_dotenv()
 import discord
 from discord.ext import commands
-import openai
+import openai # Keep this import for openai.APIStatusError if you want to catch specific OpenAI errors
+from openai import OpenAI # <--- NEW: Import the OpenAI client
 import asyncio
 import os
 from typing import Optional
@@ -23,8 +24,9 @@ class AIDiscordBot:
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.teacher_id = os.getenv('TEACHER_DISCORD_ID')
         
-        # Set up OpenAI
-        openai.api_key = self.openai_api_key
+        # Set up OpenAI client
+        # openai.api_key = self.openai_api_key # <--- REMOVE THIS LINE
+        self.openai_client = OpenAI(api_key=self.openai_api_key) # <--- NEW: Initialize the client
         
         # Bot intents
         intents = discord.Intents.default()
@@ -39,7 +41,7 @@ class AIDiscordBot:
         self.conversations = {}
         
         # Bot settings
-        self.ai_model = "gpt-3.5-turbo"
+        self.ai_model = "gpt-3.5-turbo" # Ensure this model is compatible with your OpenAI account
         self.max_tokens = 500
         self.temperature = 0.9
         
@@ -566,19 +568,21 @@ class AIDiscordBot:
             
             messages = [system_message] + conversation_history
             
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: openai.ChatCompletion.create(
-                    model=self.ai_model,
-                    messages=messages,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                    user=f'{ctx.author.id}'
-                )
+            # --- MODIFIED: OpenAI API call for openai>=1.0.0 ---
+            response = await asyncio.to_thread( # Use asyncio.to_thread for blocking OpenAI API calls in async
+                self.openai_client.chat.completions.create, # Call the new client method
+                model=self.ai_model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                user=f'{ctx.author.id}'
             )
             
             return response.choices[0].message.content.strip()
             
+        except openai.APIStatusError as e: # Catch specific OpenAI API errors
+            logger.error(f"OpenAI API error: {e}")
+            return f"Whoops! Jyle's feeling a bit buggy. OpenAI API said: '{e.message}'. Maybe try again later, or check your API key? 🛠️"
         except Exception as e:
             logger.error(f"Error getting Jyle response: {e}")
             sassy_errors = [
