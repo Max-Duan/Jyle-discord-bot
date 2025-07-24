@@ -2,8 +2,8 @@ from dotenv import load_dotenv
 load_dotenv()
 import discord
 from discord.ext import commands
-import openai # Keep this import for openai.APIStatusError if you want to catch specific OpenAI errors
-from openai import OpenAI # <--- NEW: Import the OpenAI client
+import openai
+from openai import OpenAI
 import asyncio
 import os
 from typing import Optional
@@ -25,8 +25,7 @@ class AIDiscordBot:
         self.teacher_id = os.getenv('TEACHER_DISCORD_ID')
         
         # Set up OpenAI client
-        # openai.api_key = self.openai_api_key # <--- REMOVE THIS LINE
-        self.openai_client = OpenAI(api_key=self.openai_api_key) # <--- NEW: Initialize the client
+        self.openai_client = OpenAI(api_key=self.openai_api_key)
         
         # Bot intents
         intents = discord.Intents.default()
@@ -41,7 +40,7 @@ class AIDiscordBot:
         self.conversations = {}
         
         # Bot settings
-        self.ai_model = "gpt-3.5-turbo" # Ensure this model is compatible with your OpenAI account
+        self.ai_model = "gpt-3.5-turbo" 
         self.max_tokens = 500
         self.temperature = 0.9
         
@@ -55,16 +54,20 @@ class AIDiscordBot:
         self.dm_teacher_on_commands = ['jyle', 'question', 'help_request']
         self.teacher_dm_enabled = True
         
+        # Store recent teacher DMs to track context (Guild ID, Channel ID)
+        # This will map teacher DM message ID to context: {dm_message_id: {'guild_id': ..., 'channel_id': ..., 'student_id': ...}}
+        # For simplicity, we'll rely on the teacher including IDs in their !reply command,
+        # but a persistent storage could map the teacher's DM message to context for easier replies.
+        
         self.setup_events()
         self.setup_commands()
     
     async def send_teacher_dm(self, user, channel, question, command_used):
-        """Send a DM to the teacher with the student's question"""
+        """Send a DM to the teacher with the student's question and context."""
         if not self.teacher_id or not self.teacher_dm_enabled:
             return
         
         try:
-            # A more robust way to get the teacher user object
             teacher = self.bot.get_user(int(self.teacher_id))
             if not teacher:
                 teacher = await self.bot.fetch_user(int(self.teacher_id))
@@ -77,11 +80,11 @@ class AIDiscordBot:
                     timestamp=datetime.utcnow()
                 )
                 
-                # Handling for DMs vs. guild channels
+                guild_id = channel.guild.id if isinstance(channel, discord.TextChannel) else None # Store guild_id
+                channel_id = channel.id # Store channel_id
+                
                 guild_name = channel.guild.name if isinstance(channel, discord.TextChannel) else "Direct Message"
                 channel_name = channel.name if isinstance(channel, discord.TextChannel) else "Direct Message"
-                channel_id = channel.id
-                guild_id = channel.guild.id if isinstance(channel, discord.TextChannel) else '@me'
                 
                 embed.add_field(
                     name="👤 Student",
@@ -107,16 +110,12 @@ class AIDiscordBot:
                     inline=False
                 )
                 
-                embed.add_field(
-                    name="🔗 Quick Action",
-                    value=f"Click [here](https://discord.com/channels/{guild_id}/{channel_id}) to jump to the message",
-                    inline=False
-                )
-                
-                embed.set_footer(text="Teacher Alert System")
+                # Add hidden fields for context. Using a specific format in footer.
+                # This makes it easier for the teacher to copy-paste or for the bot to parse.
+                embed.set_footer(text=f"Teacher Alert System | GuildID:{guild_id} | ChannelID:{channel_id} | StudentID:{user.id}")
                 
                 await teacher.send(embed=embed)
-                logger.info(f"Teacher DM sent for question from {user.name}")
+                logger.info(f"Teacher DM sent for question from {user.name} to GuildID:{guild_id}, ChannelID:{channel_id}")
             else:
                 logger.warning(f"Teacher user with ID {self.teacher_id} not found.")
 
@@ -148,6 +147,55 @@ class AIDiscordBot:
             if message.author == self.bot.user:
                 return
             
+            # --- NEW: Handle DM replies from the teacher ---
+            if isinstance(message.channel, discord.DMChannel) and str(message.author.id) == self.teacher_id:
+                logger.info(f"Received DM from teacher: {message.content}")
+                
+                # Teacher reply command format: !reply <guild_id> <channel_id> <message>
+                # Example: !reply 1234567890 9876543210 This is the answer to your question.
+                if message.content.lower().startswith('!reply'):
+                    parts = message.content.split(' ', 3) # Split into 4 parts: !reply, guild_id, channel_id, message
+                    if len(parts) >= 4:
+                        try:
+                            guild_id = int(parts[1])
+                            channel_id = int(parts[2])
+                            teacher_response_text = parts[3]
+                            
+                            guild = self.bot.get_guild(guild_id)
+                            if not guild:
+                                guild = await self.bot.fetch_guild(guild_id) # Try to fetch if not in cache
+                            
+                            if guild:
+                                channel = guild.get_channel(channel_id)
+                                if not channel:
+                                    channel = await guild.fetch_channel(channel_id) # Try to fetch if not in cache
+                                
+                                if channel and isinstance(channel, discord.TextChannel):
+                                    response_embed = discord.Embed(
+                                        title="👨‍🏫 Teacher's Response",
+                                        description=teacher_response_text,
+                                        color=0xffa500, # Orange color for teacher response
+                                        timestamp=datetime.utcnow()
+                                    )
+                                    response_embed.set_footer(text=f"Sent by {message.author.display_name}")
+                                    await channel.send(embed=response_embed)
+                                    await message.channel.send(f"✅ Your response has been sent to #{channel.name} in {guild.name}.")
+                                    logger.info(f"Teacher's response sent to Guild:{guild_id}, Channel:{channel_id}")
+                                else:
+                                    await message.channel.send("❌ Could not find the specified channel. Make sure the Channel ID is correct and I have access to it.")
+                                    logger.warning(f"Teacher DM reply: Channel {channel_id} not found or not a text channel in Guild {guild_id}.")
+                            else:
+                                await message.channel.send("❌ Could not find the specified server. Make sure the Guild ID is correct.")
+                                logger.warning(f"Teacher DM reply: Guild {guild_id} not found.")
+                        except ValueError:
+                            await message.channel.send("❌ Invalid Guild ID or Channel ID format. Please use `!reply <guild_id> <channel_id> <your message>`.")
+                        except Exception as e:
+                            logger.error(f"Error processing teacher DM reply: {e}")
+                            await message.channel.send(f"An unexpected error occurred: {e}")
+                    else:
+                        await message.channel.send("❌ Invalid `!reply` command format. Please use `!reply <guild_id> <channel_id> <your message>`.")
+                return # Stop processing if it's a teacher DM command
+
             # React to certain keywords with emojis
             if 'good bot' in message.content.lower():
                 await message.add_reaction('😏')
@@ -221,21 +269,21 @@ class AIDiscordBot:
         @self.bot.command(name='question', help='Ask a question - Teacher will be notified')
         async def ask_question(ctx, *, question: str):
             """Dedicated question command that always notifies the teacher"""
-            try:
-                await self.send_teacher_dm(ctx.author, ctx.channel, question, 'question')
+            await self.send_teacher_dm(ctx.author, ctx.channel, question, 'question')
+            
+            await ctx.send(f"📚 **Question received!** Your teacher has been notified.\n\n**Your question:** {question}\n\n*I'll also try to help while you wait for your teacher's response:*")
+            
+            async with ctx.typing():
+                channel_id = str(ctx.channel.id)
+                if channel_id not in self.conversations:
+                    self.conversations[channel_id] = []
                 
-                await ctx.send(f"📚 **Question received!** Your teacher has been notified.\n\n**Your question:** {question}\n\n*I'll also try to help while you wait for your teacher's response:*")
+                self.conversations[channel_id].append({
+                    "role": "user",
+                    "content": f"{ctx.author.display_name}: {question}"
+                })
                 
-                async with ctx.typing():
-                    channel_id = str(ctx.channel.id)
-                    if channel_id not in self.conversations:
-                        self.conversations[channel_id] = []
-                    
-                    self.conversations[channel_id].append({
-                        "role": "user",
-                        "content": f"{ctx.author.display_name}: {question}"
-                    })
-                    
+                try:
                     ai_response = await self.get_jyle_response(
                         self.conversations[channel_id],
                         ctx.author.display_name,
@@ -256,9 +304,9 @@ class AIDiscordBot:
                     embed.set_footer(text="Your teacher will provide the official answer soon!")
                     await ctx.send(embed=embed)
                     
-            except Exception as e:
-                logger.error(f"Error in question command: {e}")
-                await ctx.send("Sorry, I encountered an error. Please try again!")
+                except Exception as e:
+                    logger.error(f"Error getting AI response for question command: {e}")
+                    await ctx.send("Sorry, Jyle couldn't generate a quick response right now. But your teacher has still been notified!")
         
         @self.bot.command(name='help_request', help='Request help - Teacher will be notified')
         async def help_request(ctx, *, help_message: str):
@@ -383,14 +431,32 @@ class AIDiscordBot:
             )
             
             embed.add_field(
+                name="!meme",
+                value="Get a random meme response",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!stats",
+                value="Show bot statistics",
+                inline=False
+            )
+            
+            embed.add_field(
                 name="Admin Commands",
                 value="`!toggle_teacher_dm` - Toggle teacher notifications\n`!set_teacher <user_id>` - Set teacher Discord ID",
                 inline=False
             )
             
             embed.add_field(
+                name="Teacher DM Reply", # New help entry for teacher reply
+                value="`!reply <guild_id> <channel_id> <your message>` - Reply to a student's question directly from DM. Find GuildID and ChannelID in the footer of the bot's alert DM.",
+                inline=False
+            )
+            
+            embed.add_field(
                 name="Examples",
-                value="```!jyle What's the weather like?\n!question Can you explain photosynthesis?\n!help_request I'm stuck on problem 5\n!roast @username\n!compliment @username```",
+                value="```!jyle What's the weather like?\n!question Can you explain photosynthesis?\n!help_request I'm stuck on problem 5\n!roast @username\n!compliment @username\n!reply 1234567890 9876543210 This is the answer!```",
                 inline=False
             )
             
@@ -568,9 +634,8 @@ class AIDiscordBot:
             
             messages = [system_message] + conversation_history
             
-            # --- MODIFIED: OpenAI API call for openai>=1.0.0 ---
-            response = await asyncio.to_thread( # Use asyncio.to_thread for blocking OpenAI API calls in async
-                self.openai_client.chat.completions.create, # Call the new client method
+            response = await asyncio.to_thread(
+                self.openai_client.chat.completions.create,
                 model=self.ai_model,
                 messages=messages,
                 max_tokens=self.max_tokens,
@@ -580,7 +645,7 @@ class AIDiscordBot:
             
             return response.choices[0].message.content.strip()
             
-        except openai.APIStatusError as e: # Catch specific OpenAI API errors
+        except openai.APIStatusError as e:
             logger.error(f"OpenAI API error: {e}")
             return f"Whoops! Jyle's feeling a bit buggy. OpenAI API said: '{e.message}'. Maybe try again later, or check your API key? 🛠️"
         except Exception as e:
