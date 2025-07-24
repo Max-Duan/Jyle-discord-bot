@@ -9,6 +9,7 @@ from typing import Optional
 import json
 import logging
 from datetime import datetime
+import random
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -18,10 +19,9 @@ class AIDiscordBot:
     """Jyle - Your AI Discord Bot with Personality and Teacher DM Feature"""
     def __init__(self):
         # Bot configuration
-        # In your __init__ method, change this:
         self.bot_token = os.getenv('DISCORD_BOT_TOKEN')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
-        self.teacher_id = os.getenv('TEACHER_DISCORD_ID')  # Teacher's Discord User ID
+        self.teacher_id = os.getenv('TEACHER_DISCORD_ID')
         
         # Set up OpenAI
         openai.api_key = self.openai_api_key
@@ -41,17 +41,17 @@ class AIDiscordBot:
         # Bot settings
         self.ai_model = "gpt-3.5-turbo"
         self.max_tokens = 500
-        self.temperature = 0.9  # Higher temp for more creative banter
+        self.temperature = 0.9
         
         # Banter settings
-        self.banter_chance = 0.25  # 25% chance to add random banter
-        self.roast_mode = {}  # Track roast mode per channel
-        self.user_nicknames = {}  # Store fun nicknames for users
-        self.sass_level = "maximum"  # Jyle's sass level
+        self.banter_chance = 0.25
+        self.roast_mode = {}
+        self.user_nicknames = {}
+        self.sass_level = "maximum"
         
         # Teacher DM settings
-        self.dm_teacher_on_commands = ['jyle', 'question', 'help_request']  # Commands that trigger teacher DM
-        self.teacher_dm_enabled = True  # Can be toggled by admins
+        self.dm_teacher_on_commands = ['jyle', 'question', 'help_request']
+        self.teacher_dm_enabled = True
         
         self.setup_events()
         self.setup_commands()
@@ -62,7 +62,11 @@ class AIDiscordBot:
             return
         
         try:
-            teacher = await self.bot.fetch_user(int(self.teacher_id))
+            # A more robust way to get the teacher user object
+            teacher = self.bot.get_user(int(self.teacher_id))
+            if not teacher:
+                teacher = await self.bot.fetch_user(int(self.teacher_id))
+
             if teacher:
                 embed = discord.Embed(
                     title="📚 Student Question Alert",
@@ -71,21 +75,27 @@ class AIDiscordBot:
                     timestamp=datetime.utcnow()
                 )
                 
+                # Handling for DMs vs. guild channels
+                guild_name = channel.guild.name if isinstance(channel, discord.TextChannel) else "Direct Message"
+                channel_name = channel.name if isinstance(channel, discord.TextChannel) else "Direct Message"
+                channel_id = channel.id
+                guild_id = channel.guild.id if isinstance(channel, discord.TextChannel) else '@me'
+                
                 embed.add_field(
                     name="👤 Student",
-                    value=f"{user.display_name} ({user.name}#{user.discriminator})",
+                    value=f"{user.display_name} ({user.name})",
                     inline=False
                 )
                 
                 embed.add_field(
                     name="📍 Channel",
-                    value=f"#{channel.name}" if hasattr(channel, 'name') else "Direct Message",
+                    value=f"#{channel_name}",
                     inline=True
                 )
                 
                 embed.add_field(
                     name="🏫 Server",
-                    value=channel.guild.name if hasattr(channel, 'guild') and channel.guild else "Direct Message",
+                    value=guild_name,
                     inline=True
                 )
                 
@@ -97,7 +107,7 @@ class AIDiscordBot:
                 
                 embed.add_field(
                     name="🔗 Quick Action",
-                    value=f"Click [here](https://discord.com/channels/{channel.guild.id if hasattr(channel, 'guild') and channel.guild else '@me'}/{channel.id}) to jump to the message",
+                    value=f"Click [here](https://discord.com/channels/{guild_id}/{channel_id}) to jump to the message",
                     inline=False
                 )
                 
@@ -105,7 +115,9 @@ class AIDiscordBot:
                 
                 await teacher.send(embed=embed)
                 logger.info(f"Teacher DM sent for question from {user.name}")
-                
+            else:
+                logger.warning(f"Teacher user with ID {self.teacher_id} not found.")
+
         except Exception as e:
             logger.error(f"Failed to send teacher DM: {e}")
     
@@ -115,15 +127,13 @@ class AIDiscordBot:
             logger.info(f'{self.bot.user} has connected to Discord!')
             logger.info(f'Bot is in {len(self.bot.guilds)} guilds')
             
-            # Verify teacher ID if provided
             if self.teacher_id:
                 try:
                     teacher = await self.bot.fetch_user(int(self.teacher_id))
                     logger.info(f"Teacher DM configured for: {teacher.name}")
-                except:
-                    logger.warning("Could not verify teacher Discord ID")
+                except Exception:
+                    logger.warning(f"Could not verify teacher Discord ID: {self.teacher_id}")
             
-            # Set bot status
             await self.bot.change_presence(
                 activity=discord.Activity(
                     type=discord.ActivityType.listening,
@@ -133,21 +143,8 @@ class AIDiscordBot:
         
         @self.bot.event
         async def on_message(message):
-            # Ignore messages from the bot itself
             if message.author == self.bot.user:
                 return
-            
-            # Random banter chance (not for commands)
-            if not message.content.startswith('!') and not message.author.bot:
-                import random
-                if random.random() < self.banter_chance:
-                    await self.random_banter(message)
-            
-            # Detect if someone is being salty
-            salt_words = ['wtf', 'stupid', 'dumb', 'hate', 'sucks', 'terrible', 'awful', 'worst']
-            if any(word in message.content.lower() for word in salt_words) and not message.author.bot:
-                if random.random() < 0.3:  # 30% chance to respond to salt
-                    await self.handle_salt(message)
             
             # React to certain keywords with emojis
             if 'good bot' in message.content.lower():
@@ -171,61 +168,43 @@ class AIDiscordBot:
                         "I'll add that feedback to my collection of things I don't care about 💀"
                     ]
                     await message.channel.send(random.choice(sassy_comebacks))
-            
-            # Detect compliments and be sassy about them
-            compliment_words = ['smart', 'clever', 'amazing', 'awesome', 'cool', 'great', 'nice']
-            if any(word in message.content.lower() for word in compliment_words) and not message.author.bot:
-                if random.random() < 0.2:  # 20% chance to be sassy about compliments
-                    sassy_compliment_responses = [
-                        "I know, right? Finally someone gets it 💅",
-                        "Tell me something I don't already know 🙄✨",
-                        "Your taste is almost as good as my code 😏"
-                    ]
-                    await message.channel.send(random.choice(sassy_compliment_responses))
-            
+
             # Process commands
             await self.bot.process_commands(message)
-    
+
     def setup_commands(self):
         @self.bot.command(name='jyle', help='Chat with Jyle - Teacher will be notified')
         async def jyle_chat(ctx, *, message: str):
             """Main Jyle chat command with teacher DM"""
             try:
-                # Send teacher DM if enabled
                 if 'jyle' in self.dm_teacher_on_commands:
                     await self.send_teacher_dm(ctx.author, ctx.channel, message, 'jyle')
                 
-                # Show typing indicator
                 async with ctx.typing():
-                    # Get or create conversation history for this channel
                     channel_id = str(ctx.channel.id)
                     if channel_id not in self.conversations:
                         self.conversations[channel_id] = []
                     
-                    # Add user message to conversation history
                     self.conversations[channel_id].append({
                         "role": "user",
                         "content": f"{ctx.author.display_name}: {message}"
                     })
                     
-                    # Keep conversation history manageable (last 10 messages)
                     if len(self.conversations[channel_id]) > 10:
                         self.conversations[channel_id] = self.conversations[channel_id][-10:]
                     
-                    # Get Jyle response
                     jyle_response = await self.get_jyle_response(
                         self.conversations[channel_id],
                         ctx.author.display_name,
-                        str(ctx.channel.id)
+                        str(ctx.channel.id),
+                        ctx
                     )
                     
-                    # Add Jyle response to conversation history
                     self.conversations[channel_id].append({
                         "role": "assistant",
                         "content": jyle_response
                     })
                     
-                    # Split long messages if needed
                     if len(jyle_response) > 2000:
                         chunks = [jyle_response[i:i+2000] for i in range(0, len(jyle_response), 2000)]
                         for chunk in chunks:
@@ -241,32 +220,27 @@ class AIDiscordBot:
         async def ask_question(ctx, *, question: str):
             """Dedicated question command that always notifies the teacher"""
             try:
-                # Always send teacher DM for questions
                 await self.send_teacher_dm(ctx.author, ctx.channel, question, 'question')
                 
-                # Acknowledge the question
                 await ctx.send(f"📚 **Question received!** Your teacher has been notified.\n\n**Your question:** {question}\n\n*I'll also try to help while you wait for your teacher's response:*")
                 
-                # Try to provide an AI response as well
                 async with ctx.typing():
                     channel_id = str(ctx.channel.id)
                     if channel_id not in self.conversations:
                         self.conversations[channel_id] = []
                     
-                    # Add question to conversation history
                     self.conversations[channel_id].append({
                         "role": "user",
                         "content": f"{ctx.author.display_name}: {question}"
                     })
                     
-                    # Get AI response
                     ai_response = await self.get_jyle_response(
                         self.conversations[channel_id],
                         ctx.author.display_name,
-                        str(ctx.channel.id)
+                        str(ctx.channel.id),
+                        ctx
                     )
                     
-                    # Add AI response to history
                     self.conversations[channel_id].append({
                         "role": "assistant",
                         "content": ai_response
@@ -288,7 +262,6 @@ class AIDiscordBot:
         async def help_request(ctx, *, help_message: str):
             """Request help command that notifies the teacher"""
             try:
-                # Send teacher DM
                 await self.send_teacher_dm(ctx.author, ctx.channel, f"HELP REQUEST: {help_message}", 'help_request')
                 
                 await ctx.send(f"🆘 **Help request sent!** Your teacher has been notified.\n\n**Your request:** {help_message}")
@@ -310,11 +283,10 @@ class AIDiscordBot:
         async def set_teacher(ctx, user_id: str):
             """Set the teacher's Discord ID"""
             try:
-                # Verify the user exists
                 teacher = await self.bot.fetch_user(int(user_id))
                 self.teacher_id = user_id
                 await ctx.send(f"✅ Teacher set to: {teacher.name}#{teacher.discriminator}")
-            except:
+            except Exception:
                 await ctx.send("❌ Invalid user ID. Please provide a valid Discord user ID.")
         
         @self.bot.command(name='clear', help='Clear conversation history')
@@ -332,7 +304,6 @@ class AIDiscordBot:
             """Set a custom persona for the AI"""
             channel_id = str(ctx.channel.id)
             
-            # Initialize conversation with system message
             self.conversations[channel_id] = [{
                 "role": "system",
                 "content": f"You are Jyle, an AI assistant with this personality: {persona}. Respond accordingly while being helpful and engaging."
@@ -448,10 +419,8 @@ class AIDiscordBot:
                 f"I've seen more intelligence in a random number generator than in {member.display_name} 🎲"
             ]
             
-            import random
             roast = random.choice(roasts)
             
-            # Add disclaimer for good vibes
             disclaimer = "\n\n*This roast was delivered with premium sass and zero chill* 💅✨"
             await ctx.send(roast + disclaimer)
         
@@ -474,7 +443,6 @@ class AIDiscordBot:
                 f"{member.display_name} makes everyone's day better - like finding free WiFi when you need it most! 📶"
             ]
             
-            import random
             compliment = random.choice(compliments)
             await ctx.send(compliment)
         
@@ -482,7 +450,6 @@ class AIDiscordBot:
         async def set_nickname(ctx, *, nickname: str = None):
             """Set a fun nickname for yourself"""
             if not nickname:
-                # Show current nickname
                 current = self.user_nicknames.get(str(ctx.author.id), ctx.author.display_name)
                 await ctx.send(f"Your current nickname is: **{current}**")
                 return
@@ -529,7 +496,6 @@ class AIDiscordBot:
                 "And I took that personally 😤✨"
             ]
             
-            import random
             await ctx.send(random.choice(memes))
         
         @self.bot.command(name='stats', help='Show bot statistics')
@@ -569,7 +535,7 @@ class AIDiscordBot:
                 try:
                     teacher = await self.bot.fetch_user(int(self.teacher_id))
                     teacher_status = f"{teacher.name}#{teacher.discriminator}"
-                except:
+                except Exception:
                     teacher_status = "Invalid ID"
             
             embed.add_field(
@@ -580,17 +546,14 @@ class AIDiscordBot:
             
             await ctx.send(embed=embed)
     
-    async def get_jyle_response(self, conversation_history: list, username: str, channel_id: str) -> str:
+    async def get_jyle_response(self, conversation_history: list, username: str, channel_id: str, ctx) -> str:
         """Get response from OpenAI API with Jyle's personality"""
         try:
             # Get user's nickname if they have one
-            user_hash = str(hash(username))
-            display_name = self.user_nicknames.get(user_hash, username)
+            display_name = self.user_nicknames.get(str(ctx.author.id), username)
             
-            # Check if roast mode is enabled for this channel
             roast_mode = self.roast_mode.get(channel_id, False)
             
-            # Enhanced system message with Jyle's banter personality
             if roast_mode:
                 personality = f"You are Jyle, a sassy, witty AI assistant with a playful roasting personality. You love friendly banter and gentle teasing, but you're never truly mean. You use humor, tech jokes, and clever comebacks. Keep it fun and lighthearted. The user you're talking to is {display_name}."
             else:
@@ -601,7 +564,6 @@ class AIDiscordBot:
                 "content": personality
             }
             
-            # Combine system message with conversation history
             messages = [system_message] + conversation_history
             
             response = await asyncio.get_event_loop().run_in_executor(
@@ -611,7 +573,7 @@ class AIDiscordBot:
                     messages=messages,
                     max_tokens=self.max_tokens,
                     temperature=self.temperature,
-                    user=f'{ctx.author.id}' # Use the user's ID
+                    user=f'{ctx.author.id}'
                 )
             )
             
@@ -626,7 +588,6 @@ class AIDiscordBot:
                 "Jyle's circuits are having a moment. Give me a sec! ⚡",
                 "Jyle.exe has stopped working. Turning it off and on again... ⭕"
             ]
-            import random
             return random.choice(sassy_errors)
     
     async def random_banter(self, message):
@@ -644,7 +605,6 @@ class AIDiscordBot:
             "Someone's been drinking their smart juice today 🧃🧠"
         ]
         
-        import random
         await message.channel.send(random.choice(banter_lines))
     
     async def handle_salt(self, message):
@@ -660,7 +620,6 @@ class AIDiscordBot:
             "Time for some emotional exception handling 🛠️❤️"
         ]
         
-        import random
         await message.channel.send(random.choice(salt_responses))
     
     def run(self):
@@ -685,4 +644,3 @@ class AIDiscordBot:
 if __name__ == "__main__":
     bot = AIDiscordBot()
     bot.run()
-
