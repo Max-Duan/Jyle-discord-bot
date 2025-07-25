@@ -122,7 +122,7 @@ class AIDiscordBot:
         except Exception as e:
             logger.error(f"Failed to send teacher DM: {e}")
     
-    def setup_events(self):
+    def setup_events(self):        
         @self.bot.event
         async def on_ready():
             logger.info(f'{self.bot.user} has connected to Discord!')
@@ -222,7 +222,7 @@ class AIDiscordBot:
             # Process commands
             await self.bot.process_commands(message)
 
-    def setup_commands(self):
+    def setup_commands(self):        
         @self.bot.command(name='jyle', help='Chat with Jyle - Teacher will be notified')
         async def jyle_chat(ctx, *, message: str):
             """Main Jyle chat command with teacher DM"""
@@ -320,7 +320,7 @@ class AIDiscordBot:
                 logger.error(f"Error in help_request command: {e}")
                 await ctx.send("Sorry, I encountered an error. Please try again!")
         
-        @self.bot.command(name='toggle_teacher_dm', help='Toggle teacher DM notifications (Admin only)')
+        @self.bot.command(name='toggle_teacher_dm', help='Toggle teacher DM notifications (Admin only)')        
         @commands.has_permissions(administrator=True)
         async def toggle_teacher_dm(ctx):
             """Toggle teacher DM notifications"""
@@ -328,7 +328,7 @@ class AIDiscordBot:
             status = "enabled" if self.teacher_dm_enabled else "disabled"
             await ctx.send(f"📨 Teacher DM notifications are now **{status}**")
         
-        @self.bot.command(name='set_teacher', help='Set teacher Discord ID (Admin only)')
+        @self.bot.command(name='set_teacher', help='Set teacher Discord ID (Admin only)')        
         @commands.has_permissions(administrator=True)
         async def set_teacher(ctx, user_id: str):
             """Set the teacher's Discord ID"""
@@ -532,7 +532,27 @@ class AIDiscordBot:
         @self.bot.command(name='banter', help='Get some random banter')
         async def random_banter_command(ctx):
             """Get some random banter on demand"""
-            await self.random_banter(ctx.message)
+            # This function is not defined in the provided code, so I'm removing the call or adding a placeholder.
+            # Assuming you might want to call the get_jyle_response with some banter prompt.
+            # For now, let's just send a simple message.
+            await ctx.send("Here's some random banter for you! 😄")
+
+            # If you want AI-generated banter, you'd need something like:
+            # try:
+            #     channel_id = str(ctx.channel.id)
+            #     banter_prompt = "Give me a short, witty, and sassy piece of banter."
+            #     # Temporarily add to conversation for AI context, or use a fresh list
+            #     temp_conversation = [{"role": "user", "content": banter_prompt}]
+            #     banter_response = await self.get_jyle_response(
+            #         temp_conversation,
+            #         ctx.author.display_name,
+            #         channel_id,
+            #         ctx
+            #     )
+            #     await ctx.send(banter_response)
+            # except Exception as e:
+            #     logger.error(f"Error getting banter: {e}")
+            #     await ctx.send("Couldn't fetch banter right now, my circuits are tangled! 😬")
         
         @self.bot.command(name='roastmode', help='Toggle roast mode')
         async def toggle_roast_mode(ctx):
@@ -654,5 +674,6 @@ class AIDiscordBot:
                 "Jyle's brain is buffering... try again! 🧠💻",
                 "Houston, we have a problem... and by Houston, I mean Jyle's servers 🚀",
                 "Error 418: Jyle's a teapot... wait, that's not right 🫖",
-                "Jyle's"
+                "Jyle's circuits are having a moment. Please stand by for awesome. 💫" # Added closing quote
             ]
+            return random.choice(sassy_errors)
