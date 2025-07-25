@@ -401,4 +401,258 @@ class AIDiscordBot:
             )
             
             embed.add_field(
-                name="!roast @
+                name="!roast @user",
+                value="Playfully roast someone (all in good fun!)",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!compliment @user",
+                value="Give someone a nice compliment",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!nickname <name>",
+                value="Set a fun nickname for yourself",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!banter",
+                value="Get some random banter from the bot",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!roastmode",
+                value="Toggle roast mode for extra spicy Jyle responses",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!meme",
+                value="Get a random meme response",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="!stats",
+                value="Show bot statistics",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Admin Commands",
+                value="`!toggle_teacher_dm` - Toggle teacher notifications\n`!set_teacher <user_id>` - Set teacher Discord ID",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Teacher DM Reply", # New help entry for teacher reply
+                value="`!reply <guild_id> <channel_id> <your message>` - Reply to a student's question directly from DM. Find GuildID and ChannelID in the footer of the bot's alert DM.",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="Examples",
+                value="```!jyle What's the weather like?\n!question Can you explain photosynthesis?\n!help_request I'm stuck on problem 5\n!roast @username\n!compliment @username\n!reply 1234567890 9876543210 This is the answer!```",
+                inline=False
+            )
+            
+            embed.set_footer(text="📨 Commands marked with notification will alert your teacher!")
+            
+            await ctx.send(embed=embed)
+        
+        @self.bot.command(name='roast', help='Playfully roast someone')
+        async def roast_user(ctx, member: discord.Member = None):
+            """Playfully roast a user or yourself"""
+            if member is None:
+                member = ctx.author
+            
+            roasts = [
+                f"{member.display_name}, you're like a software update - nobody wants you, but we're stuck with you anyway 😏",
+                f"I'd roast {member.display_name}, but my GPU would overheat from processing that much material 🔥",
+                f"{member.display_name} has the energy of a Windows 95 computer trying to run Cyberpunk 2077 💀",
+                f"I was going to make a joke about {member.display_name}, but my sass protocols have limits 🤖💅",
+                f"{member.display_name} is like Internet Explorer - slow to respond and nobody's first choice 😂",
+                f"If {member.display_name} was a programming language, they'd be HTML - not even technically real 💀",
+                f"{member.display_name} types 'google.com' into Google to get to Google... and I'm not surprised 🤦‍♀️",
+                f"{member.display_name} is the human equivalent of a loading screen that never finishes 🌀",
+                f"I'd explain it to {member.display_name}, but I left my crayons AND my patience at home 🖍️💅",
+                f"{member.display_name} probably thinks RAM is a male sheep... bless their heart 🐏",
+                f"{member.display_name} has main character energy... in a tragedy 🎭",
+                f"If confidence was code, {member.display_name} would be full of bugs 🐛",
+                f"{member.display_name} is like a WiFi connection - weak and unreliable 📶💀",
+                f"I've seen more intelligence in a random number generator than in {member.display_name} 🎲"
+            ]
+            
+            roast = random.choice(roasts)
+            
+            disclaimer = "\n\n*This roast was delivered with premium sass and zero chill* 💅✨"
+            await ctx.send(roast + disclaimer)
+        
+        @self.bot.command(name='compliment', help='Give someone a nice compliment')
+        async def compliment_user(ctx, member: discord.Member = None):
+            """Give someone a genuine compliment"""
+            if member is None:
+                member = ctx.author
+            
+            compliments = [
+                f"{member.display_name} has the debugging skills that would make Linus Torvalds proud! 🔧",
+                f"{member.display_name} is like a perfectly optimized algorithm - efficient and elegant! ✨",
+                f"If {member.display_name} was code, they'd be clean, well-documented, and bug-free! 📝",
+                f"{member.display_name} brings more joy than finding that missing semicolon! 🎉",
+                f"{member.display_name} is the human equivalent of 100% code coverage - reliable and comprehensive! 💯",
+                f"Meeting {member.display_name} is like finding a Stack Overflow answer that actually works! 🙏",
+                f"{member.display_name} has more positive energy than a fully charged Tesla! ⚡",
+                f"If kindness was a programming language, {member.display_name} would be fluent in all dialects! 💝",
+                f"{member.display_name} is proof that humans can be just as awesome as AI! 🤖❤️",
+                f"{member.display_name} makes everyone's day better - like finding free WiFi when you need it most! 📶"
+            ]
+            
+            compliment = random.choice(compliments)
+            await ctx.send(compliment)
+        
+        @self.bot.command(name='nickname', help='Set a fun nickname')
+        async def set_nickname(ctx, *, nickname: str = None):
+            """Set a fun nickname for yourself"""
+            if not nickname:
+                current = self.user_nicknames.get(str(ctx.author.id), ctx.author.display_name)
+                await ctx.send(f"Your current nickname is: **{current}**")
+                return
+            
+            if len(nickname) > 50:
+                await ctx.send("Whoa there, keep it under 50 characters! I have standards 📏💅")
+                return
+            
+            self.user_nicknames[str(ctx.author.id)] = nickname
+            await ctx.send(f"Nickname set! Jyle will now call you **{nickname}** (you're welcome) 🏷️💅")
+        
+        @self.bot.command(name='banter', help='Get some random banter')
+        async def random_banter_command(ctx):
+            """Get some random banter on demand"""
+            await self.random_banter(ctx.message)
+        
+        @self.bot.command(name='roastmode', help='Toggle roast mode')
+        async def toggle_roast_mode(ctx):
+            """Toggle roast mode for spicier responses"""
+            channel_id = str(ctx.channel.id)
+            current_mode = self.roast_mode.get(channel_id, False)
+            self.roast_mode[channel_id] = not current_mode
+            
+            if self.roast_mode[channel_id]:
+                await ctx.send("🌶️ **ROAST MODE ACTIVATED** 🌶️\nJyle's sass levels are now at MAXIMUM. Prepare for destruction! Use `!roastmode` again if you can't handle the heat 💅🔥")
+            else:
+                await ctx.send("❄️ **Roast mode disabled** ❄️\nJyle is back to regular sass levels (which is still pretty high, let's be honest) 😏")
+        
+        @self.bot.command(name='meme', help='Get a random meme response')
+        async def meme_response(ctx):
+            """Send a random meme-style response"""
+            memes = [
+                "That's what she said! 😏 (I had to, it was right there)",
+                "Instructions unclear, got Jyle stuck in the matrix 🌀",
+                "Task failed successfully! Just like your last attempt ✅❌",
+                "This is fine 🔥🐕🔥 (narrator: it was not fine)",
+                "Have you tried turning your brain off and on again? 🧠🔌",
+                "Error 404: Your common sense not found 😴",
+                "Achievement unlocked: Successfully confused the AI (not impressed) 🏆",
+                "I'm not a robot... I'm better than a robot 🤖💅",
+                "Press F to pay respects... to your dignity 📱💀",
+                "It's not a bug, it's a 'creative feature'! 🐛➡️✨",
+                "Big oof energy right there 💀",
+                "And I took that personally 😤✨"
+            ]
+            
+            await ctx.send(random.choice(memes))
+        
+        @self.bot.command(name='stats', help='Show bot statistics')
+        async def bot_stats(ctx):
+            """Show bot statistics"""
+            embed = discord.Embed(
+                title="📊 Bot Statistics",
+                color=0x0099ff
+            )
+            
+            embed.add_field(
+                name="Servers",
+                value=len(self.bot.guilds),
+                inline=True
+            )
+            
+            embed.add_field(
+                name="Active Conversations",
+                value=len(self.conversations),
+                inline=True
+            )
+            
+            embed.add_field(
+                name="Jyle Model",
+                value=self.ai_model,
+                inline=True
+            )
+            
+            embed.add_field(
+                name="Teacher DM",
+                value="✅ Enabled" if self.teacher_dm_enabled else "❌ Disabled",
+                inline=True
+            )
+            
+            teacher_status = "Not Set"
+            if self.teacher_id:
+                try:
+                    teacher = await self.bot.fetch_user(int(self.teacher_id))
+                    teacher_status = f"{teacher.name}#{teacher.discriminator}"
+                except Exception:
+                    teacher_status = "Invalid ID"
+            
+            embed.add_field(
+                name="Teacher",
+                value=teacher_status,
+                inline=True
+            )
+            
+            await ctx.send(embed=embed)
+    
+    async def get_jyle_response(self, conversation_history: list, username: str, channel_id: str, ctx) -> str:
+        """Get response from OpenAI API with Jyle's personality"""
+        try:
+            # Get user's nickname if they have one
+            display_name = self.user_nicknames.get(str(ctx.author.id), username)
+            
+            roast_mode = self.roast_mode.get(channel_id, False)
+            
+            if roast_mode:
+                personality = f"You are Jyle, a sassy, witty AI assistant with a playful roasting personality. You love friendly banter and gentle teasing, but you're never truly mean. You use humor, tech jokes, and clever comebacks. Keep it fun and lighthearted. The user you're talking to is {display_name}."
+            else:
+                personality = f"You are Jyle, a fun, engaging AI assistant who loves banter and humor. You're witty but friendly, use tech jokes and memes when appropriate, and have a playful personality. You occasionally throw in some gentle teasing but always stay positive. The user you're talking to is {display_name}."
+            
+            system_message = {
+                "role": "system",
+                "content": personality
+            }
+            
+            messages = [system_message] + conversation_history
+            
+            response = await asyncio.to_thread(
+                self.openai_client.chat.completions.create,
+                model=self.ai_model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                user=f'{ctx.author.id}'
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except openai.APIStatusError as e:
+            logger.error(f"OpenAI API error: {e}")
+            return f"Whoops! Jyle's feeling a bit buggy. OpenAI API said: '{e.message}'. Maybe try again later, or check your API key? 🛠️"
+        except Exception as e:
+            logger.error(f"Error getting Jyle response: {e}")
+            sassy_errors = [
+                "Jyle's brain is buffering... try again! 🧠💻",
+                "Houston, we have a problem... and by Houston, I mean Jyle's servers 🚀",
+                "Error 418: Jyle's a teapot... wait, that's not right 🫖",
+                "Jyle's"
+            ]
